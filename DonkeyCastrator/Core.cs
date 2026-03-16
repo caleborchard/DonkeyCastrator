@@ -12,26 +12,27 @@ namespace DonkeyCastrator
 {
     public class Core : MelonMod
     {
-        private readonly HashSet<int> reportedInstanceIds = new HashSet<int>();
-        private readonly HashSet<int> scannedIds = new HashSet<int>();
-        private readonly Dictionary<int, int> childCountCache = new Dictionary<int, int>();
+        private readonly HashSet<int> reportedInstanceIds = new();
+        private readonly HashSet<int> scannedIds = new();
+        private readonly Dictionary<int, int> childCountCache = new();
 
-        private readonly HashSet<int> discoveredNodeIds = new HashSet<int>();
-        private readonly Dictionary<int, int> discoveryChildCountCache = new Dictionary<int, int>();
-        private readonly Queue<Transform> discoveryQueue = new Queue<Transform>();
-        private readonly HashSet<int> queuedDiscoveryIds = new HashSet<int>();
+        private readonly HashSet<int> discoveredNodeIds = new();
+        private readonly Dictionary<int, int> discoveryChildCountCache = new();
+        private readonly Queue<Transform> discoveryQueue = new();
+        private readonly HashSet<int> queuedDiscoveryIds = new();
 
-        private readonly List<Transform> censorRoots = new List<Transform>();
-        private readonly HashSet<int> censorRootIds = new HashSet<int>();
-        private readonly List<Transform> censoredTargets = new List<Transform>();
-        private readonly HashSet<int> censoredTargetIds = new HashSet<int>();
+        private readonly List<Transform> censorRoots = new();
+        private readonly HashSet<int> censorRootIds = new();
+        private readonly List<Transform> censoredTargets = new();
+        private readonly HashSet<int> censoredTargetIds = new();
 
-        private float nextScanTime = 0f;
-        private float nextDiscoveryTime = 0f;
-        private float nextWarningTime = 0f;
+        private float nextScanTime;
+        private float nextDiscoveryTime;
+        private float nextWarningTime;
 
         private const float ScanInterval = 1f;
         private const float DiscoveryInterval = 5f;
+        private const float WarningCooldown = 2f;
         private const float DiscoveryFrameBudgetMs = 1.0f;
         private const int MaxDiscoveryNodesPerFrame = 200;
 
@@ -91,12 +92,12 @@ namespace DonkeyCastrator
         {
             try
             {
-                List<string> found = new List<string>();
+                List<string> found = new();
 
                 for (int i = censorRoots.Count - 1; i >= 0; i--)
                 {
                     Transform root = censorRoots[i];
-                    if (root == null || !root.gameObject.scene.isLoaded)
+                    if (!IsLoaded(root))
                     {
                         censorRoots.RemoveAt(i);
                         continue;
@@ -116,7 +117,7 @@ namespace DonkeyCastrator
                 if (Time.unscaledTime >= nextWarningTime)
                 {
                     MelonLogger.Warning($"DonkeyCastrator scan error: {ex.Message}");
-                    nextWarningTime = Time.unscaledTime + 2f;
+                    nextWarningTime = Time.unscaledTime + WarningCooldown;
                 }
             }
         }
@@ -190,6 +191,7 @@ namespace DonkeyCastrator
         private void EnqueueForDiscovery(Transform t)
         {
             if (t == null) return;
+
             int id = t.GetInstanceID();
             if (!queuedDiscoveryIds.Add(id)) return;
             discoveryQueue.Enqueue(t);
@@ -204,9 +206,8 @@ namespace DonkeyCastrator
 
             if (reportedInstanceIds.Contains(id))
             {
-                if (t.localScale != Vector3.zero) t.localScale = Vector3.zero;
-                scannedIds.Add(id);
-                childCountCache[id] = childCount;
+                EnsureZeroScale(t);
+                CacheScanState(id, childCount);
                 return;
             }
 
@@ -228,18 +229,16 @@ namespace DonkeyCastrator
                     reportedInstanceIds.Add(id);
                     found.Add(name);
                     if (censoredTargetIds.Add(id)) censoredTargets.Add(t);
-                    if (t.localScale != Vector3.zero) t.localScale = Vector3.zero;
+                    EnsureZeroScale(t);
                 }
 
-                scannedIds.Add(id);
-                childCountCache[id] = childCount;
+                CacheScanState(id, childCount);
                 return;
             }
 
             for (int i = 0; i < childCount; i++) CheckObjectRecursive(t.GetChild(i), found);
 
-            scannedIds.Add(id);
-            childCountCache[id] = childCount;
+            CacheScanState(id, childCount);
         }
 
         private void EnforceCensoredTargets()
@@ -247,14 +246,30 @@ namespace DonkeyCastrator
             for (int i = censoredTargets.Count - 1; i >= 0; i--)
             {
                 Transform target = censoredTargets[i];
-                if (target == null || !target.gameObject.scene.isLoaded)
+                if (!IsLoaded(target))
                 {
                     censoredTargets.RemoveAt(i);
                     continue;
                 }
 
-                if (target.localScale != Vector3.zero) target.localScale = Vector3.zero;
+                EnsureZeroScale(target);
             }
+        }
+
+        private bool IsLoaded(Transform t)
+        {
+            return t != null && t.gameObject.scene.isLoaded;
+        }
+
+        private void EnsureZeroScale(Transform t)
+        {
+            if (t.localScale != Vector3.zero) t.localScale = Vector3.zero;
+        }
+
+        private void CacheScanState(int id, int childCount)
+        {
+            scannedIds.Add(id);
+            childCountCache[id] = childCount;
         }
     }
 }
