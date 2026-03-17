@@ -106,11 +106,13 @@ namespace DonkeyCastrator
                     CheckObjectRecursive(root, found);
                 }
 
+                /*
                 if (found.Count > 0)
                 {
                     LoggerInstance.Msg($"Found {found.Count} flagged object(s):");
                     for (int i = 0; i < found.Count; i++) LoggerInstance.Msg($"  - {found[i]}");
                 }
+                */
             }
             catch (Exception ex)
             {
@@ -179,7 +181,7 @@ namespace DonkeyCastrator
             if (t.GetComponent<RegisterCensorBones>() != null && censorRootIds.Add(id))
             {
                 censorRoots.Add(t);
-                LoggerInstance.Msg($"Found RegisterCensorBones on parent object: {t.gameObject.name}");
+                //LoggerInstance.Msg($"Found RegisterCensorBones on parent object: {t.gameObject.name}");
             }
 
             for (int i = 0; i < childCount; i++) EnqueueForDiscovery(t.GetChild(i));
